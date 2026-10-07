@@ -14,30 +14,31 @@
 <!-- 홈 -->
 <header class="bg-indigo-600 p-4 text-white font-bold text-lg flex justify-between items-center shadow-md">
   <span>🐶🐱 우리동네 멍냥이 수호대</span>
-  <span class="text-xs bg-white text-indigo-600 px-2 py-1 rounded-full">v1.2</span>
+  <span class="text-xs bg-white text-indigo-600 px-2 py-1 rounded-full">v1.3</span>
 </header>
 <main class="flex-1 p-4 pb-24 space-y-4">
   <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-3 text-xs text-indigo-900">
     <p class="font-semibold">🚨 우리동네 반려동물 지킴이 안내</p>
-    <p>· 길고양이 혹은 길 잃은 강아지를 발견하셨나요?</p>
+    <p>· 길고양이 혹은 길 잃은 강아지, 기타 동물을 발견하셨나요?</p>
     <p>· 인식표가 있다면 정확한 이름을, 없다면 특징을 남겨주세요!</p>
   </div>
   <div class="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100 p-2">
-    <div class="text-xs font-bold text-gray-600 mb-1 px-1">📍 내 주변 멍냥이 목격 지도 <span class="font-normal text-gray-400">(위치는 약 100m 범위로 흐리게 표시)</span></div>
+    <div class="text-xs font-bold text-gray-600 mb-1 px-1">📍 내 주변 반려동물 목격 지도 <span class="font-normal text-gray-400">(위치는 약 100m 범위로 흐리게 표시)</span></div>
     <div id="map" class="w-full h-56 rounded-lg z-0"></div>
     <div id="map-selected" class="px-1 pb-1"></div>
   </div>
   <div class="flex gap-2">
-    <button onclick="filterPets('all')" id="filter-all" class="flex-1 bg-indigo-600 text-white text-xs font-bold py-2 rounded-xl">전체보기</button>
+    <button onclick="filterPets('all')" id="filter-all" class="flex-1 bg-indigo-600 text-white text-xs font-bold py-2 rounded-xl">전체</button>
     <button onclick="filterPets('dog')" id="filter-dog" class="flex-1 bg-white border border-gray-200 text-gray-600 text-xs font-bold py-2 rounded-xl">🐶 강아지</button>
     <button onclick="filterPets('cat')" id="filter-cat" class="flex-1 bg-white border border-gray-200 text-gray-600 text-xs font-bold py-2 rounded-xl">🐱 고양이</button>
+    <button onclick="filterPets('other')" id="filter-other" class="flex-1 bg-white border border-gray-200 text-gray-600 text-xs font-bold py-2 rounded-xl">🐹 기타</button>
   </div>
   <div class="font-bold text-sm text-gray-700 mt-2">✨ 실시간 동네 제보 피드</div>
   <div id="feed-list" class="space-y-4"><div class="bg-white rounded-xl p-4 text-center text-gray-400 text-xs">불러오는 중...</div></div>
 </main>
 <nav class="fixed bottom-0 max-w-md w-full bg-white border-t border-gray-200 p-3 flex justify-center shadow-lg z-30">
   <label class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl shadow flex items-center justify-center cursor-pointer text-sm">
-    <span>📷 멍냥이 사진 찍기</span>
+    <span>📷 반려동물 사진 찍기</span>
     <input type="file" accept="image/*" class="hidden" onchange="handleImageSelected(event)">
   </label>
 </nav>
@@ -53,7 +54,7 @@
 <!-- 등록 화면 -->
 <div id="register" class="hidden fixed inset-0 bg-gray-50 z-50 max-w-md mx-auto overflow-y-auto">
   <header class="sticky top-0 bg-indigo-600 text-white p-4 flex items-center gap-2 font-bold shadow-md z-10">
-    <span data-back></span><span>🐾 멍냥이 개체 확인</span>
+    <span data-back></span><span>🐾 반려동물 개체 확인</span>
   </header>
   <div class="p-4 space-y-4 pb-10">
     <p class="text-xs text-gray-500">찍으신 사진과 아래 동네 친구들을 비교해보세요!</p>
@@ -62,9 +63,10 @@
     </div>
     <div>
       <label class="text-xs text-gray-500 font-semibold">어떤 동물인가요?</label>
-      <div class="grid grid-cols-2 gap-2 mt-1">
+      <div class="grid grid-cols-3 gap-2 mt-1">
         <button type="button" onclick="setPetType('dog')" id="type-dog-btn" class="border py-2 rounded-xl text-xs font-bold">🐶 강아지</button>
         <button type="button" onclick="setPetType('cat')" id="type-cat-btn" class="border py-2 rounded-xl text-xs font-bold">🐱 고양이</button>
+        <button type="button" onclick="setPetType('other')" id="type-other-btn" class="border py-2 rounded-xl text-xs font-bold">🐹 기타</button>
       </div>
     </div>
     <div>
@@ -104,6 +106,19 @@ const fmt = s => new Date(s).toLocaleDateString('ko-KR');
 const NAME_PH = "예: 초코, 몽이, 혹은 '인식표 없음(노랑이)'";
 const REASONS = ['부적절한 사진', '부적절한 이름', '같은 동물이 중복 등록됨', '잘못된 정보 (종류·위치 등)', '삭제 요청 (내가 올린 사진)', '기타'];
 const ON = 'border-indigo-600 bg-indigo-50 text-indigo-700', OFF = 'border-gray-200 bg-white text-gray-600';
+
+/* ---------- 동물 이모지 및 배지 헬퍼 함수 ---------- */
+const getPetEmoji = (t) => {
+  if (t === 'dog') return '🐶';
+  if (t === 'cat') return '🐱';
+  return '🐹';
+};
+
+const badge = t => {
+  if (t === 'dog') return '<span class="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-bold">🐶 강아지</span>';
+  if (t === 'cat') return '<span class="text-[10px] bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full font-bold">🐱 고양이</span>';
+  return '<span class="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">🐹 기타</span>';
+};
 
 /* ---------- 화면 이동: 왼쪽 화살표 = 브라우저 뒤로가기와 동일 ---------- */
 const BACK = '<button type="button" onclick="history.back()" aria-label="뒤로가기" class="p-1 -ml-1 rounded-full active:bg-white/25"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>';
@@ -160,9 +175,10 @@ function renderMarkers() {
   allPetsData.forEach(pet => {
     const last = (sightingsByPet[pet.id] || [])[0] || pet;
     if (last.latitude == null || last.longitude == null) return;
+    const emoji = getPetEmoji(pet.type);
     const icon = L.divIcon({
       className: 'emoji-marker',
-      html: `<div style="font-size:28px;line-height:1;filter:drop-shadow(0 1px 2px rgba(0,0,0,.45))">${pet.type === 'dog' ? '🐶' : '🐱'}</div>`,
+      html: `<div style="font-size:28px;line-height:1;filter:drop-shadow(0 1px 2px rgba(0,0,0,.45))">${emoji}</div>`,
       iconSize: [30, 30], iconAnchor: [15, 15]
     });
     L.marker([last.latitude, last.longitude], { icon, title: pet.name || '' })
@@ -171,7 +187,7 @@ function renderMarkers() {
   });
 }
 
-const HINT = '<p class="text-[11px] text-gray-400 text-center pt-2">🐾 지도의 🐶🐱를 누르면 여기에 표시돼요</p>';
+const HINT = '<p class="text-[11px] text-gray-400 text-center pt-2">🐾 지도의 아이콘을 누르면 여기에 표시돼요</p>';
 function showMapSelected(id) {
   const box = document.getElementById('map-selected');
   const pet = allPetsData.find(p => p.id === id);
@@ -191,14 +207,10 @@ document.getElementById('map-selected').addEventListener('click', e => {
   const el = e.target.closest('[data-pet]'); if (el) openDetail(el.dataset.pet);
 });
 
-const badge = t => t === 'dog'
-  ? '<span class="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-bold">🐶 강아지</span>'
-  : '<span class="text-[10px] bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full font-bold">🐱 고양이</span>';
-
 function renderFeed() {
   const list = currentFilter === 'all' ? allPetsData : allPetsData.filter(p => p.type === currentFilter);
   document.getElementById('feed-list').innerHTML = list.length === 0
-    ? `<div class="bg-white rounded-xl p-6 text-center text-gray-400 text-sm">${allPetsData.length ? '해당하는 동물이 없어요!' : '아직 등록된 멍냥이가 없어요. 첫 제보를 남겨주세요! 🐾'}</div>`
+    ? `<div class="bg-white rounded-xl p-6 text-center text-gray-400 text-sm">${allPetsData.length ? '해당하는 동물이 없어요!' : '아직 등록된 반려동물이 없어요. 첫 제보를 남겨주세요! 🐾'}</div>`
     : list.map(pet => {
         const n = (sightingsByPet[pet.id] || []).length + 1;
         const last = (sightingsByPet[pet.id] || [])[0] || pet;
@@ -215,9 +227,13 @@ document.getElementById('feed-list').addEventListener('click', e => {
 
 function filterPets(type) {
   currentFilter = type;
-  ['all', 'dog', 'cat'].forEach(t => document.getElementById('filter-' + t).className = t === type
-    ? 'flex-1 bg-indigo-600 text-white text-xs font-bold py-2 rounded-xl'
-    : 'flex-1 bg-white border border-gray-200 text-gray-600 text-xs font-bold py-2 rounded-xl');
+  ['all', 'dog', 'cat', 'other'].forEach(t => {
+    const btn = document.getElementById('filter-' + t);
+    if (!btn) return;
+    btn.className = t === type
+      ? 'flex-1 bg-indigo-600 text-white text-xs font-bold py-2 rounded-xl'
+      : 'flex-1 bg-white border border-gray-200 text-gray-600 text-xs font-bold py-2 rounded-xl';
+  });
   renderFeed();
 }
 
@@ -282,8 +298,10 @@ async function submitReportForm() {
 /* ---------- 등록 ---------- */
 function setPetType(type) {
   selectedPetType = type;
-  document.getElementById('type-dog-btn').className = 'border py-2 rounded-xl text-xs font-bold ' + (type === 'dog' ? ON : OFF);
-  document.getElementById('type-cat-btn').className = 'border py-2 rounded-xl text-xs font-bold ' + (type === 'cat' ? ON : OFF);
+  ['dog', 'cat', 'other'].forEach(t => {
+    const btn = document.getElementById('type-' + t + '-btn');
+    if (btn) btn.className = 'border py-2 rounded-xl text-xs font-bold ' + (type === t ? ON : OFF);
+  });
   loadExistingPetsForMatch();
 }
 
