@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>동네 길고양이 개체 식별 서비스</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- Supabase 자바스크립트 라이브러리 로드 -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-gray-50 text-gray-800 max-w-md mx-auto min-h-screen flex flex-col">
+
+    <!-- 상단 헤더 -->
+    <header class="bg-amber-400 p-4 text-white font-bold text-lg flex justify-between items-center shadow-md">
+        <span>🐾 우리동네 고양이 수호대</span>
+        <span class="text-xs bg-white text-amber-600 px-2 py-1 rounded-full">MVP v0.2</span>
+    </header>
+
+    <!-- 메인 컨텐츠 영역 -->
+    <main class="flex-1 p-4 pb-20">
+        <!-- 안내 배너 -->
+        <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 text-xs text-amber-800">
+            <p class="font-semibold">🚨 필수 준수 사항</p>
+            <p>· 고양이만 촬영해주세요. (사람 얼굴 및 차량 번호판 절대 금지)</p>
+            <p>· 위치는 고양이 보호를 위해 주변 반경으로 안전하게 분산 표시됩니다.</p>
+        </div>
+
+        <!-- 타임라인 피드 리스트 (Supabase에서 데이터 불러와서 채워짐) -->
+        <div id="feed-list" class="space-y-4">
+            <div class="bg-white rounded-xl shadow-sm p-4 text-center text-gray-400">
+                데이터를 불러오는 중...
+            </div>
+        </div>
+    </main>
+
+    <!-- 하단 고정 제보 버튼 -->
+    <nav class="fixed bottom-0 max-w-md w-full bg-white border-t border-gray-200 p-3 flex justify-center shadow-lg">
+        <button onclick="openReportModal()" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 rounded-xl shadow transition flex items-center justify-center gap-2">
+            <span>📷 고양이 제보·촬영하기</span>
+        </button>
+    </nav>
+
+    <!-- 간단 제보 테스트 모달/창 (임시) -->
+    <div id="report-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-2xl w-full max-w-sm p-5 space-y-4">
+            <h3 class="font-bold text-lg text-gray-800">새로운 고양이 제보하기</h3>
+            <div>
+                <label class="text-xs text-gray-500 font-semibold">고양이 이름 (또는 특징)</label>
+                <input type="text" id="cat-name" placeholder="예: 치즈" class="w-full mt-1 border border-gray-300 rounded-lg p-2 text-sm focus:outline-none focus:border-amber-500">
+            </div>
+            <div class="flex gap-2 pt-2">
+                <button onclick="closeReportModal()" class="flex-1 bg-gray-200 text-gray-700 py-2 rounded-xl text-sm font-bold">취소</button>
+                <button onclick="submitReport()" class="flex-1 bg-amber-500 text-white py-2 rounded-xl text-sm font-bold">등록하기</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Supabase 연동 및 동작 스크립트 -->
+    <script>
+        // 사용자가 제공한 Supabase 연결 정보 적용
+        const SUPABASE_URL = 'https://zholdszcpnnotiofoeot.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_SL6t58EupHer5LU-O9L7Qw_xGg5Iz5-';
+        
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // 페이지가 열릴 때 고양이 데이터 불러오기
+        async function fetchCats() {
+            const feedList = document.getElementById('feed-list');
+            
+            // cats 테이블에서 데이터 가져오기
+            const { data, error } = await supabaseClient.from('cats').select('*').order('created_at', { ascending: false });
+
+            if (error) {
+                console.error('데이터 불러오기 실패:', error);
+                feedList.innerHTML = `<div class="bg-white rounded-xl shadow-sm p-4 text-center text-red-400 text-xs">데이터를 불러오는 중 오류가 발생했습니다.</div>`;
+                return;
+            }
+
+            if (!data || data.length === 0) {
+                feedList.innerHTML = `<div class="bg-white rounded-xl shadow-sm p-6 text-center text-gray-400 text-sm">아직 등록된 고양이가 없어요. 첫 제보를 남겨주세요! 🐾</div>`;
+                return;
+            }
+
+            // 화면에 카드 형태로 렌더링
+            feedList.innerHTML = data.map(cat => `
+                <div class="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
+                    <div class="p-3 flex items-center justify-between">
+                        <span class="font-bold text-sm">🧀 ${cat.name || '이름 없음'}</span>
+                        <span class="text-xs text-gray-400">방금 전</span>
+                    </div>
+                    <div class="bg-gray-100 h-48 flex items-center justify-center text-gray-400 text-xs">
+                        ${cat.profile_image_url ? `<img src="${cat.profile_image_url}" class="w-full h-full object-cover">` : '[고양이 사진]'}
+                    </div>
+                    <div class="p-3 text-xs text-gray-600 space-y-1">
+                        <p>📍 목격 위치: 동네 인근 반경 내</p>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // 제보 모달 열기/닫기
+        function openReportModal() {
+            document.getElementById('report-modal').classList.remove('hidden');
+        }
+        function closeReportModal() {
+            document.getElementById('report-modal').classList.add('hidden');
+        }
+
+        // 고양이 등록 전송 함수
+        async function submitReport() {
+            const nameInput = document.getElementById('cat-name');
+            const name = nameInput.value.trim();
+
+            if (!name) {
+                alert('고양이 이름을 입력해주세요!');
+                return;
+            }
+
+            // Supabase cats 테이블에 데이터 추가
+            const { error } = await supabaseClient.from('cats').insert([{ name: name }]);
+
+            if (error) {
+                alert('등록 중 오류가 발생했습니다: ' + error.message);
+            } else {
+                alert('성공적으로 등록되었습니다! 🐾');
+                nameInput.value = '';
+                closeReportModal();
+                fetchCats(); // 목록 새로고침
+            }
+        }
+
+        // 앱 시작 시 실행
+        fetchCats();
+    </script>
+</body>
+</html>
