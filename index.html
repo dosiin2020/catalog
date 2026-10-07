@@ -14,7 +14,7 @@
 <!-- 홈 -->
 <header class="bg-indigo-600 p-4 text-white font-bold text-lg flex justify-between items-center shadow-md">
   <span>🐶🐱 우리동네 멍냥이 수호대</span>
-  <span class="text-xs bg-white text-indigo-600 px-2 py-1 rounded-full">v1.3</span>
+  <span class="text-xs bg-white text-indigo-600 px-2 py-1 rounded-full">v1.4</span>
 </header>
 <main class="flex-1 p-4 pb-24 space-y-4">
   <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-3 text-xs text-indigo-900">
@@ -54,10 +54,10 @@
 <!-- 등록 화면 -->
 <div id="register" class="hidden fixed inset-0 bg-gray-50 z-50 max-w-md mx-auto overflow-y-auto">
   <header class="sticky top-0 bg-indigo-600 text-white p-4 flex items-center gap-2 font-bold shadow-md z-10">
-    <span data-back></span><span>🐾 반려동물 개체 확인</span>
+    <span data-back></span><span id="register-header-title">🐾 반려동물 개체 확인</span>
   </header>
   <div class="p-4 space-y-4 pb-10">
-    <p class="text-xs text-gray-500">찍으신 사진과 아래 동네 친구들을 비교해보세요!</p>
+    <p id="register-desc" class="text-xs text-gray-500">찍으신 사진과 아래 동네 친구들을 비교해보세요!</p>
     <div class="w-full h-44 bg-gray-100 rounded-xl overflow-hidden border border-gray-200">
       <img id="preview-img" class="w-full h-full object-cover" alt="찍은 사진">
     </div>
@@ -69,12 +69,12 @@
         <button type="button" onclick="setPetType('other')" id="type-other-btn" class="border py-2 rounded-xl text-xs font-bold">🐹 기타</button>
       </div>
     </div>
-    <div>
+    <div id="existing-section">
       <label class="text-xs text-gray-500 font-semibold">1. 이미 등록된 동네 친구인가요?</label>
       <div id="existing-pets-container" class="mt-2 space-y-2 max-h-40 overflow-y-auto border border-gray-200 rounded-xl p-2 bg-white"></div>
     </div>
     <div class="border-t border-gray-200 pt-3">
-      <label class="text-xs text-gray-500 font-semibold">2. 새로운 친구라면 이름(인식표 이름)을 적어주세요</label>
+      <label class="text-xs text-gray-500 font-semibold" id="new-name-label">2. 새로운 친구라면 이름(인식표 이름)을 적어주세요</label>
       <input type="text" id="new-pet-name" maxlength="20" class="w-full mt-1 border border-gray-300 rounded-lg p-2 text-sm focus:outline-none focus:border-indigo-500 disabled:bg-gray-100">
     </div>
     <button onclick="submitRegister()" id="submit-btn" class="w-full bg-indigo-600 text-white py-3 rounded-xl text-sm font-bold">등록하기</button>
@@ -100,6 +100,13 @@ const supabaseClient = supabase.createClient(
   'https://zholdszcpnnotiofoeot.supabase.co',
   'sb_publishable_SL6t58EupHer5LU-O9L7Qw_xGg5Iz5-');
 
+// 내 작성자 고유 ID 생성/관리 (수정/삭제 권한 확인용)
+let myUuid = localStorage.getItem('my_uuid');
+if (!myUuid) {
+  myUuid = 'user_' + Math.random().toString(36).substring(2) + Date.now().toString(36);
+  localStorage.setItem('my_uuid', myUuid);
+}
+
 const esc = s => String(s ?? '').replace(/[&<>"']/g,
   c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt = s => new Date(s).toLocaleDateString('ko-KR');
@@ -107,7 +114,6 @@ const NAME_PH = "예: 초코, 몽이, 혹은 '인식표 없음(노랑이)'";
 const REASONS = ['부적절한 사진', '부적절한 이름', '같은 동물이 중복 등록됨', '잘못된 정보 (종류·위치 등)', '삭제 요청 (내가 올린 사진)', '기타'];
 const ON = 'border-indigo-600 bg-indigo-50 text-indigo-700', OFF = 'border-gray-200 bg-white text-gray-600';
 
-/* ---------- 동물 이모지 및 배지 헬퍼 함수 ---------- */
 const getPetEmoji = (t) => {
   if (t === 'dog') return '🐶';
   if (t === 'cat') return '🐱';
@@ -120,7 +126,7 @@ const badge = t => {
   return '<span class="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">🐹 기타</span>';
 };
 
-/* ---------- 화면 이동: 왼쪽 화살표 = 브라우저 뒤로가기와 동일 ---------- */
+/* ---------- 화면 이동 ---------- */
 const BACK = '<button type="button" onclick="history.back()" aria-label="뒤로가기" class="p-1 -ml-1 rounded-full active:bg-white/25"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>';
 document.querySelectorAll('[data-back]').forEach(e => e.outerHTML = BACK);
 
@@ -141,6 +147,7 @@ let currentLat = 37.5665, currentLng = 126.9780, locationReady = false;
 let selectedBlob = null, selectedExistingPetId = null, selectedPetType = 'dog';
 let currentFilter = 'all', allPetsData = [], sightingsByPet = {};
 let detailPet = null, reportTarget = null, mapSelectedId = null;
+let editingPetId = null; // 수정 중인 펫 ID (null이면 신규등록)
 
 function initMap() {
   map = L.map('map').setView([currentLat, currentLng], 15);
@@ -242,27 +249,100 @@ function openDetail(id) {
   const pet = allPetsData.find(p => String(p.id) === id); if (!pet) return;
   detailPet = pet;
   const list = sightingsByPet[pet.id] || [];
+  const isMyPet = pet.user_uuid === myUuid;
+
   document.getElementById('detail-title').textContent = pet.name || '이름 없음';
   document.getElementById('detail-body').innerHTML = `
     <img src="${esc(pet.image_url)}" alt="${esc(pet.name)}" class="w-full h-64 object-cover rounded-xl bg-gray-200">
-    <div class="flex items-center justify-between"><span class="font-bold text-lg">${esc(pet.name) || '이름 없음'}</span>${badge(pet.type)}</div>
+    <div class="flex items-center justify-between">
+      <span class="font-bold text-lg">${esc(pet.name) || '이름 없음'}</span>${badge(pet.type)}
+    </div>
     <p class="text-xs text-gray-500">처음 발견 ${fmt(pet.created_at)} · 목격 ${list.length + 1}회</p>
-    ${list.length ? `<div class="font-bold text-sm">목격 기록</div><div class="space-y-2">${list.map(s => `
+    
+    ${isMyPet ? `
+      <div class="flex gap-2 pt-1">
+        <button onclick="startEditPet('${esc(pet.id)}')" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold py-2 rounded-xl border border-gray-200">✏️ 반려동물 정보 수정</button>
+        <button onclick="deletePet('${esc(pet.id)}', '${esc(pet.image_url)}')" class="flex-1 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold py-2 rounded-xl border border-red-200">🗑️ 전체 삭제</button>
+      </div>` : ''}
+
+    ${list.length ? `<div class="font-bold text-sm mt-2">목격 기록</div><div class="space-y-2">${list.map(s => `
       <div class="bg-white rounded-xl border border-gray-100 p-2 flex items-center gap-3">
         <img src="${esc(s.image_url)}" alt="" loading="lazy" class="w-14 h-14 rounded-lg object-cover bg-gray-200">
         <span class="flex-1 text-xs text-gray-600">${fmt(s.created_at)}</span>
-        <button data-sight="${esc(s.id)}" class="text-[11px] text-red-500 font-bold px-2 py-1">신고</button>
+        ${s.user_uuid === myUuid ? `<button onclick="deleteSighting('${esc(s.id)}', '${esc(s.image_url)}')" class="text-[11px] text-red-500 font-bold px-2 py-1 bg-red-50 rounded">삭제</button>` : ''}
+        <button data-sight="${esc(s.id)}" class="text-[11px] text-gray-400 font-bold px-1 py-1">신고</button>
       </div>`).join('')}</div>` : ''}
-    <button data-pet-report class="w-full border border-red-200 text-red-600 text-sm font-bold py-3 rounded-xl">🚩 이 제보 신고 · 삭제 요청</button>`;
+    <button data-pet-report class="w-full border border-red-200 text-red-600 text-sm font-bold py-3 rounded-xl mt-4">🚩 이 제보 신고 · 삭제 요청</button>`;
   document.getElementById('detail').scrollTop = 0;
   go('detail');
 }
+
 document.getElementById('detail-body').addEventListener('click', e => {
   const s = e.target.closest('[data-sight]');
   if (s) return openReport({ kind: 'sighting', id: s.dataset.sight, label: '이 목격 사진' });
   if (e.target.closest('[data-pet-report]'))
     openReport({ kind: 'pet', id: detailPet.id, label: `'${detailPet.name || '이름 없음'}' 제보` });
 });
+
+/* ---------- 수정 및 삭제 핸들러 함수들 ---------- */
+async function deletePet(id, imageUrl) {
+  if (!confirm('정말 이 반려동물과 관련된 모든 목격 사진을 삭제하시겠습니까?')) return;
+  try {
+    const ss = sightingsByPet[id] || [];
+    const urls = [imageUrl, ...ss.map(x => x.image_url)].map(u => {
+      const i = (u || '').indexOf('/cat-images/');
+      return i < 0 ? null : decodeURIComponent(u.slice(i + 12).split('?')[0]);
+    }).filter(Boolean);
+
+    if (urls.length) await supabaseClient.storage.from('cat-images').remove(urls);
+    await supabaseClient.from('pets').delete().eq('id', id);
+    alert('삭제되었습니다.');
+    history.back();
+    fetchPets();
+  } catch (err) {
+    alert('삭제 실패: ' + err.message);
+  }
+}
+
+async function deleteSighting(id, imageUrl) {
+  if (!confirm('이 목격 기록을 삭제하시겠습니까?')) return;
+  try {
+    const i = (imageUrl || '').indexOf('/cat-images/');
+    const name = i < 0 ? null : decodeURIComponent(imageUrl.slice(i + 12).split('?')[0]);
+    if (name) await supabaseClient.storage.from('cat-images').remove([name]);
+    await supabaseClient.from('sightings').delete().eq('id', id);
+    alert('삭제되었습니다.');
+    openDetail(detailPet.id);
+    fetchPets();
+  } catch (err) {
+    alert('삭제 실패: ' + err.message);
+  }
+}
+
+function startEditPet(id) {
+  const pet = allPetsData.find(p => String(p.id) === id);
+  if (!pet) return;
+  editingPetId = id;
+  selectedBlob = null;
+  selectedExistingPetId = null;
+
+  document.getElementById('register-header-title').textContent = '✏️ 반려동물 정보 수정';
+  document.getElementById('register-desc').textContent = '정보를 수정하고 수정하기 버튼을 눌러주세요.';
+  document.getElementById('preview-img').src = pet.image_url;
+  
+  // 기존 등록/매칭 영역은 수정 모드일 때 숨김
+  document.getElementById('existing-section').classList.add('hidden');
+  document.getElementById('new-name-label').textContent = '반려동물 이름 (인식표 이름)';
+  
+  const nameInput = document.getElementById('new-pet-name');
+  nameInput.value = pet.name || '';
+  nameInput.disabled = false;
+
+  setPetType(pet.type);
+  document.getElementById('submit-btn').textContent = '수정 완료';
+  document.getElementById('register').scrollTop = 0;
+  go('register');
+}
 
 /* ---------- 신고 ---------- */
 const reportedKey = t => `${t.kind}:${t.id}`;
@@ -295,14 +375,14 @@ async function submitReportForm() {
   fetchPets();
 }
 
-/* ---------- 등록 ---------- */
+/* ---------- 등록 / 수정 ---------- */
 function setPetType(type) {
   selectedPetType = type;
   ['dog', 'cat', 'other'].forEach(t => {
     const btn = document.getElementById('type-' + t + '-btn');
     if (btn) btn.className = 'border py-2 rounded-xl text-xs font-bold ' + (type === t ? ON : OFF);
   });
-  loadExistingPetsForMatch();
+  if (!editingPetId) loadExistingPetsForMatch();
 }
 
 function resizeImage(file) {
@@ -331,6 +411,14 @@ async function handleImageSelected(event) {
   if (!file) return;
   if (!file.type.startsWith('image/')) return alert('이미지 파일만 올릴 수 있어요.');
   try { selectedBlob = await resizeImage(file); } catch { return alert('사진을 읽지 못했어요. 다른 사진으로 시도해주세요.'); }
+  
+  editingPetId = null; // 신규 촬영 모드
+  document.getElementById('register-header-title').textContent = '🐾 반려동물 개체 확인';
+  document.getElementById('register-desc').textContent = '찍으신 사진과 아래 동네 친구들을 비교해보세요!';
+  document.getElementById('existing-section').classList.remove('hidden');
+  document.getElementById('new-name-label').textContent = '2. 새로운 친구라면 이름(인식표 이름)을 적어주세요';
+  document.getElementById('submit-btn').textContent = '등록하기';
+
   document.getElementById('preview-img').src = URL.createObjectURL(selectedBlob);
   setPetType(selectedPetType);
   document.getElementById('register').scrollTop = 0;
@@ -371,27 +459,42 @@ const fuzz = v => v + (Math.random() - 0.5) * 0.002;
 async function submitRegister() {
   const btn = document.getElementById('submit-btn');
   const name = document.getElementById('new-pet-name').value.trim();
-  if (!selectedExistingPetId && !name) return alert('새 이름이나 인식표 정보를 입력하거나, 목록에서 기존 친구를 선택해주세요!');
-  if (!selectedBlob) return;
+  if (!editingPetId && !selectedExistingPetId && !name) return alert('새 이름이나 인식표 정보를 입력하거나, 목록에서 기존 친구를 선택해주세요!');
   btn.innerText = '저장 중...'; btn.disabled = true;
-  try {
-    const file = `${Date.now()}_${Math.random().toString(36).slice(2, 9)}.jpg`;
-    const up = await supabaseClient.storage.from('cat-images').upload(file, selectedBlob, { contentType: 'image/jpeg' });
-    if (up.error) throw new Error('사진 업로드 실패: ' + up.error.message);
-    const image_url = supabaseClient.storage.from('cat-images').getPublicUrl(file).data.publicUrl;
-    const latitude = locationReady ? fuzz(currentLat) : null;
-    const longitude = locationReady ? fuzz(currentLng) : null;
 
-    if (selectedExistingPetId) {
-      const { error } = await supabaseClient.from('sightings').insert([{ pet_id: selectedExistingPetId, image_url, latitude, longitude }]);
-      if (error) throw new Error('목격 기록 저장 실패');
-      alert('목격 기록이 추가되었습니다! 🐾');
-    } else {
-      const { error } = await supabaseClient.from('pets').insert([{ name, type: selectedPetType, image_url, latitude, longitude }]);
-      if (error) throw new Error('등록 실패');
-      alert('새로운 친구가 등록되었습니다! 🐾');
+  try {
+    let image_url = null;
+    if (selectedBlob) {
+      const file = `${Date.now()}_${Math.random().toString(36).slice(2, 9)}.jpg`;
+      const up = await supabaseClient.storage.from('cat-images').upload(file, selectedBlob, { contentType: 'image/jpeg' });
+      if (up.error) throw new Error('사진 업로드 실패: ' + up.error.message);
+      image_url = supabaseClient.storage.from('cat-images').getPublicUrl(file).data.publicUrl;
     }
+
+    if (editingPetId) {
+      // 수정 모드
+      const updateData = { name, type: selectedPetType };
+      if (image_url) updateData.image_url = image_url;
+      const { error } = await supabaseClient.from('pets').update(updateData).eq('id', editingPetId);
+      if (error) throw new Error('수정 실패');
+      alert('반려동물 정보가 수정되었습니다! ✨');
+    } else {
+      const latitude = locationReady ? fuzz(currentLat) : null;
+      const longitude = locationReady ? fuzz(currentLng) : null;
+
+      if (selectedExistingPetId) {
+        const { error } = await supabaseClient.from('sightings').insert([{ pet_id: selectedExistingPetId, image_url, latitude, longitude, user_uuid: myUuid }]);
+        if (error) throw new Error('목격 기록 저장 실패');
+        alert('목격 기록이 추가되었습니다! 🐾');
+      } else {
+        const { error } = await supabaseClient.from('pets').insert([{ name, type: selectedPetType, image_url, latitude, longitude, user_uuid: myUuid }]);
+        if (error) throw new Error('등록 실패');
+        alert('새로운 친구가 등록되었습니다! 🐾');
+      }
+    }
+
     selectedBlob = null;
+    editingPetId = null;
     history.back();
     fetchPets();
   } catch (err) {
