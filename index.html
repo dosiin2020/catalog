@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>우리동네 멍냥이 수호대 - 우리동네 친구들을 등록해줘!</title>
+    <title>우리동네 멍냥이 수호대 - 반려동물 목격 & 실종 찾기</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <!-- Supabase JS SDK -->
@@ -25,7 +25,7 @@
         <!-- 안내 배너 -->
         <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-3 text-xs text-indigo-900">
             <p class="font-semibold">🚨 우리동네 반려동물 지킴이 안내</p>
-            <p>· 길냥이 혹은 길 잃은 강아지를 발견하셨나요?</p>
+            <p>· 길고양이 혹은 길 잃은 강아지를 발견하셨나요?</p>
             <p>· 인식표가 있다면 정확한 이름을, 없다면 특징을 남겨주세요!</p>
         </div>
 
@@ -54,7 +54,7 @@
     <!-- 하단 고정 제보 버튼 (사진 먼저 촬영/선택) -->
     <nav class="fixed bottom-0 max-w-md w-full bg-white border-t border-gray-200 p-3 flex justify-center shadow-lg z-50">
         <label class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl shadow transition flex items-center justify-center gap-2 cursor-pointer text-center text-sm">
-            <span>📷 멍냥이 사진 찍기</span>
+            <span>📷 멍냥이 사진 먼저 찍기 / 선택하기</span>
             <input type="file" id="initial-pet-image" accept="image/*" class="hidden" onchange="handleImageSelected(event)">
         </label>
     </nav>
@@ -304,4 +304,70 @@
             selectedExistingPetId = null;
         }
 
-        async function submitReport
+        async function submitReport() {
+            const nameInput = document.getElementById('new-pet-name');
+            const submitBtn = document.getElementById('submit-btn');
+            const newName = nameInput.value.trim();
+
+            if (!selectedExistingPetId && !newName) {
+                alert('새로운 이름이나 인식표 정보를 입력하거나, 위 목록에서 기존 친구를 선택해주세요!');
+                return;
+            }
+
+            submitBtn.innerText = '저장 중...';
+            submitBtn.disabled = true;
+
+            try {
+                const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}.jpg`;
+                const { error: uploadError } = await supabaseClient.storage.from('cat-images').upload(fileName, selectedCompressedBlob, {
+                    contentType: 'image/jpeg'
+                });
+
+                if (uploadError) throw new Error('사진 업로드 실패: ' + uploadError.message);
+
+                const { data: publicData } = supabaseClient.storage.from('cat-images').getPublicUrl(fileName);
+                const imageUrl = publicData.publicUrl;
+
+                const finalLat = currentLat + (Math.random() - 0.5) * 0.002;
+                const finalLng = currentLng + (Math.random() - 0.5) * 0.002;
+
+                if (selectedExistingPetId) {
+                    const { error: updateError } = await supabaseClient.from('cats').update({
+                        image_url: imageUrl,
+                        latitude: finalLat,
+                        longitude: finalLng
+                    }).eq('id', selectedExistingPetId);
+
+                    if (updateError) throw new Error('업데이트 실패');
+                    alert('기존 친구의 목격 기록이 추가되었습니다! 🐾');
+
+                } else {
+                    const { error: insertError } = await supabaseClient.from('cats').insert([{
+                        name: newName,
+                        type: selectedPetType, // 'dog' 또는 'cat'
+                        image_url: imageUrl,
+                        latitude: finalLat,
+                        longitude: finalLng
+                    }]);
+
+                    if (insertError) throw new Error('등록 실패');
+                    alert('새로운 멍냥이가 등록되었습니다! 실종 동견/동묘 주인의 눈에 띄기를 바랍니다. 🙏');
+                }
+
+                closeReportModal();
+                nameInput.value = '';
+                fetchPets();
+
+            } catch (err) {
+                alert(err.message);
+            } finally {
+                submitBtn.innerText = '등록하기';
+                submitBtn.disabled = false;
+            }
+        }
+
+        initMap();
+        fetchPets();
+    </script>
+</body>
+</html>
