@@ -6,49 +6,66 @@
     <title>동네 길고양이 개체 식별 서비스</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <!-- Supabase 자바스크립트 라이브러리 로드 -->
+    <!-- Supabase JS SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Leaflet 지도 라이브러리 (GPS 지도용) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 <body class="bg-gray-50 text-gray-800 max-w-md mx-auto min-h-screen flex flex-col">
 
     <!-- 상단 헤더 -->
     <header class="bg-amber-400 p-4 text-white font-bold text-lg flex justify-between items-center shadow-md">
         <span>🐾 우리동네 고양이 수호대</span>
-        <span class="text-xs bg-white text-amber-600 px-2 py-1 rounded-full">MVP v0.2</span>
+        <span class="text-xs bg-white text-amber-600 px-2 py-1 rounded-full">MVP v0.3</span>
     </header>
 
     <!-- 메인 컨텐츠 영역 -->
-    <main class="flex-1 p-4 pb-20">
+    <main class="flex-1 p-4 pb-24 space-y-4">
         <!-- 안내 배너 -->
-        <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 text-xs text-amber-800">
+        <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
             <p class="font-semibold">🚨 필수 준수 사항</p>
-            <p>· 고양이만 촬영해주세요. (사람 얼굴 및 차량 번호판 절대 금지)</p>
-            <p>· 위치는 고양이 보호를 위해 주변 반경으로 안전하게 분산 표시됩니다.</p>
+            <p>· 고양이만 촬영해주세요. (사람 및 차량 번호판 절대 금지)</p>
+            <p>· 위치는 고양이 보호를 위해 안전 반경으로 자동 분산 표시됩니다.</p>
         </div>
 
-        <!-- 타임라인 피드 리스트 (Supabase에서 데이터 불러와서 채워짐) -->
+        <!-- 1. GPS 기반 지도 영역 (첫 화면 상단) -->
+        <div class="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100 p-2">
+            <div class="text-xs font-bold text-gray-600 mb-1 px-1">📍 내 주변 길고양이 목격 지도</div>
+            <div id="map" class="w-full h-48 rounded-lg z-0"></div>
+        </div>
+
+        <!-- 타임라인 피드 리스트 -->
+        <div class="font-bold text-sm text-gray-700 mt-2">✨ 실시간 동네 제보 피드</div>
         <div id="feed-list" class="space-y-4">
-            <div class="bg-white rounded-xl shadow-sm p-4 text-center text-gray-400">
+            <div class="bg-white rounded-xl shadow-sm p-4 text-center text-gray-400 text-xs">
                 데이터를 불러오는 중...
             </div>
         </div>
     </main>
 
     <!-- 하단 고정 제보 버튼 -->
-    <nav class="fixed bottom-0 max-w-md w-full bg-white border-t border-gray-200 p-3 flex justify-center shadow-lg">
+    <nav class="fixed bottom-0 max-w-md w-full bg-white border-t border-gray-200 p-3 flex justify-center shadow-lg z-50">
         <button onclick="openReportModal()" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 rounded-xl shadow transition flex items-center justify-center gap-2">
             <span>📷 고양이 제보·촬영하기</span>
         </button>
     </nav>
 
-    <!-- 간단 제보 테스트 모달/창 (임시) -->
+    <!-- 2. 고양이 제보 및 사진 업로드 모달 -->
     <div id="report-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
         <div class="bg-white rounded-2xl w-full max-w-sm p-5 space-y-4">
             <h3 class="font-bold text-lg text-gray-800">새로운 고양이 제보하기</h3>
+            
             <div>
                 <label class="text-xs text-gray-500 font-semibold">고양이 이름 (또는 특징)</label>
-                <input type="text" id="cat-name" placeholder="예: 치즈" class="w-full mt-1 border border-gray-300 rounded-lg p-2 text-sm focus:outline-none focus:border-amber-500">
+                <input type="text" id="cat-name" placeholder="예: 치즈, 삼색이" class="w-full mt-1 border border-gray-300 rounded-lg p-2 text-sm focus:outline-none focus:border-amber-500">
             </div>
+
+            <div>
+                <label class="text-xs text-gray-500 font-semibold">고양이 사진 촬영/선택</label>
+                <input type="file" id="cat-image" accept="image/*" class="w-full mt-1 border border-gray-300 rounded-lg p-2 text-xs file:mr-4 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100">
+            </div>
+
             <div class="flex gap-2 pt-2">
                 <button onclick="closeReportModal()" class="flex-1 bg-gray-200 text-gray-700 py-2 rounded-xl text-sm font-bold">취소</button>
                 <button onclick="submitReport()" class="flex-1 bg-amber-500 text-white py-2 rounded-xl text-sm font-bold">등록하기</button>
@@ -56,24 +73,52 @@
         </div>
     </div>
 
-    <!-- Supabase 연동 및 동작 스크립트 -->
+    <!-- 로직 스크립트 -->
     <script>
-        // 사용자가 제공한 Supabase 연결 정보 적용
         const SUPABASE_URL = 'https://zholdszcpnnotiofoeot.supabase.co';
         const SUPABASE_KEY = 'sb_publishable_SL6t58EupHer5LU-O9L7Qw_xGg5Iz5-';
-        
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        // 페이지가 열릴 때 고양이 데이터 불러오기
+        let map, userMarker;
+        let currentLat = 37.5665; // 기본값 (서울 시청)
+        let currentLng = 126.9780;
+
+        // 지도 초기화 및 GPS 위치 가져오기
+        function initMap() {
+            map = L.map('map').setView([currentLat, currentLng], 15);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+            }).addTo(map);
+
+            // 스마트폰 GPS 권한 요청 및 위치 설정
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(position => {
+                    currentLat = position.coords.latitude;
+                    currentLng = position.coords.longitude;
+                    
+                    map.setView([currentLat, currentLng], 15);
+
+                    // 내 위치 파란색 동그라미 아이콘 표시
+                    userMarker = L.circleMarker([currentLat, currentLng], {
+                        radius: 8,
+                        color: '#ffffff',
+                        weight: 2,
+                        fillColor: '#3b82f6',
+                        fillOpacity: 1
+                    }).addTo(map).bindPopup("내 현재 위치").openPopup();
+                }, error => {
+                    console.warn("GPS 위치를 가져올 수 없습니다:", error.message);
+                });
+            }
+        }
+
+        // 데이터 불러오기
         async function fetchCats() {
             const feedList = document.getElementById('feed-list');
-            
-            // cats 테이블에서 데이터 가져오기
             const { data, error } = await supabaseClient.from('cats').select('*').order('created_at', { ascending: false });
 
             if (error) {
-                console.error('데이터 불러오기 실패:', error);
-                feedList.innerHTML = `<div class="bg-white rounded-xl shadow-sm p-4 text-center text-red-400 text-xs">데이터를 불러오는 중 오류가 발생했습니다.</div>`;
+                feedList.innerHTML = `<div class="bg-white rounded-xl shadow-sm p-4 text-center text-red-400 text-xs">데이터 불러오기 실패</div>`;
                 return;
             }
 
@@ -82,24 +127,22 @@
                 return;
             }
 
-            // 화면에 카드 형태로 렌더링
             feedList.innerHTML = data.map(cat => `
                 <div class="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
                     <div class="p-3 flex items-center justify-between">
                         <span class="font-bold text-sm">🧀 ${cat.name || '이름 없음'}</span>
-                        <span class="text-xs text-gray-400">방금 전</span>
+                        <span class="text-xs text-gray-400">최근 목격</span>
                     </div>
-                    <div class="bg-gray-100 h-48 flex items-center justify-center text-gray-400 text-xs">
-                        ${cat.profile_image_url ? `<img src="${cat.profile_image_url}" class="w-full h-full object-cover">` : '[고양이 사진]'}
+                    <div class="bg-gray-100 h-48 flex items-center justify-center text-gray-400 text-xs overflow-hidden">
+                        ${cat.image_url ? `<img src="${cat.image_url}" class="w-full h-full object-cover">` : '[사진 없음]'}
                     </div>
-                    <div class="p-3 text-xs text-gray-600 space-y-1">
-                        <p>📍 목격 위치: 동네 인근 반경 내</p>
+                    <div class="p-3 text-xs text-gray-600">
+                        <p>📍 위치 정보 보호 적용됨</p>
                     </div>
                 </div>
             `).join('');
         }
 
-        // 제보 모달 열기/닫기
         function openReportModal() {
             document.getElementById('report-modal').classList.remove('hidden');
         }
@@ -107,9 +150,10 @@
             document.getElementById('report-modal').classList.add('hidden');
         }
 
-        // 고양이 등록 전송 함수
+        // 제보 등록 (사진 업로드 + GPS 위치 포함)
         async function submitReport() {
             const nameInput = document.getElementById('cat-name');
+            const imageInput = document.getElementById('cat-image');
             const name = nameInput.value.trim();
 
             if (!name) {
@@ -117,20 +161,55 @@
                 return;
             }
 
-            // Supabase cats 테이블에 데이터 추가
-            const { error } = await supabaseClient.from('cats').insert([{ name: name }]);
+            let imageUrl = '';
+
+            // 1. 사진 파일이 있다면 Supabase Storage에 업로드
+            if (imageInput.files.length > 0) {
+                const file = imageInput.files[0];
+                const fileExt = file.name.split('.').pop();
+                const fileName = `${Math.random()}.${fileExt}`;
+                const filePath = `${fileName}`;
+
+                // 'cat-images'라는 스토리지 버킷에 업로드 (Supabase 버킷 생성 필요)
+                const { error: uploadError } = await supabaseClient.storage.from('cat-images').upload(filePath, file);
+
+                if (uploadError) {
+                    alert('사진 업로드 실패: ' + uploadError.message);
+                    return;
+                }
+
+                // 업로드된 파일의 공개 URL 가져오기
+                const { data: publicData } = supabaseClient.storage.from('cat-images').getPublicUrl(filePath);
+                imageUrl = publicData.publicUrl;
+            }
+
+            // 2. 보안을 위한 위치 미세 분산 (랜덤 오프셋 약 50~100m 내외 변환)
+            const randomOffsetLat = (Math.random() - 0.5) * 0.002;
+            const randomOffsetLng = (Math.random() - 0.5) * 0.002;
+            const finalLat = currentLat + randomOffsetLat;
+            const finalLng = currentLng + randomOffsetLng;
+
+            // 3. Supabase DB에 저장
+            const { error } = await supabaseClient.from('cats').insert([{
+                name: name,
+                image_url: imageUrl,
+                latitude: finalLat,
+                longitude: finalLng
+            }]);
 
             if (error) {
                 alert('등록 중 오류가 발생했습니다: ' + error.message);
             } else {
-                alert('성공적으로 등록되었습니다! 🐾');
+                alert('고양이가 성공적으로 제보되었습니다! 🐾');
                 nameInput.value = '';
+                imageInput.value = '';
                 closeReportModal();
-                fetchCats(); // 목록 새로고침
+                fetchCats();
             }
         }
 
-        // 앱 시작 시 실행
+        // 앱 실행 시 초기화
+        initMap();
         fetchCats();
     </script>
 </body>
