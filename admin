@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex,nofollow">
+<title>관리자 - 멍냥이 수호대</title>
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-gray-50 text-gray-800 max-w-2xl mx-auto min-h-screen p-4">
+<h1 class="font-bold text-lg mb-4">🛠 멍냥이 수호대 관리자</h1>
+
+<form id="login" class="space-y-2 max-w-sm" onsubmit="doLogin(event)">
+  <input id="email" type="email" required placeholder="관리자 이메일" autocomplete="username" class="w-full border border-gray-300 rounded-lg p-2 text-sm">
+  <input id="pw" type="password" required placeholder="비밀번호" autocomplete="current-password" class="w-full border border-gray-300 rounded-lg p-2 text-sm">
+  <button class="w-full bg-indigo-600 text-white py-2 rounded-lg text-sm font-bold">로그인</button>
+  <p id="login-msg" class="text-xs text-red-500"></p>
+</form>
+
+<div id="panel" class="hidden space-y-3">
+  <div class="flex items-center gap-2">
+    <button data-filter="reported" class="tab flex-1 text-xs font-bold py-2 rounded-xl"></button>
+    <button data-filter="hidden" class="tab flex-1 text-xs font-bold py-2 rounded-xl"></button>
+    <button data-filter="all" class="tab flex-1 text-xs font-bold py-2 rounded-xl"></button>
+    <button onclick="doLogout()" class="text-xs text-gray-500 px-2 py-2">로그아웃</button>
+  </div>
+  <div id="list" class="space-y-3"></div>
+</div>
+
+<script>
+const sb = supabase.createClient(
+  'https://zholdszcpnnotiofoeot.supabase.co',
+  'sb_publishable_SL6t58EupHer5LU-O9L7Qw_xGg5Iz5-',
+  { auth: { storageKey: 'admin-auth' } }); // 일반 앱과 로그인 정보를 분리
+
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = s => new Date(s).toLocaleString('ko-KR');
+const fileOf = u => { const i = (u || '').indexOf('/cat-images/'); return i < 0 ? null : decodeURIComponent(u.slice(i + 12).split('?')[0]); };
+
+let pets = [], sights = [], reports = [], filter = 'reported';
+
+async function doLogin(e) {
+  e.preventDefault();
+  const { error } = await sb.auth.signInWithPassword({ email: email.value.trim(), password: pw.value });
+  document.getElementById('login-msg').textContent = error ? '로그인 실패: 이메일/비밀번호를 확인하세요.' : '';
+  if (!error) show();
+}
+async function doLogout() { await sb.auth.signOut(); location.reload(); }
+async function show() {
+  document.getElementById('login').classList.add('hidden');
+  document.getElementById('panel').classList.remove('hidden');
+  await load();
+}
+
+async function load() {
+  const [p, s, r] = await Promise.all([
+    sb.from('pets').select('*').order('created_at', { ascending: false }),
+    sb.from('sightings').select('*').order('created_at', { ascending: false }),
+    sb.from('reports').select('*').order('created_at', { ascending: false })
+  ]);
+  const err = p.error || s.error || r.error;
+  if (err) { document.getElementById('list').innerHTML = `<p class="text-sm text-red-500">불러오기 실패: ${esc(err.message)}</p>`; return; }
+  pets = p.data; sights = s.data; reports = r.data;
+  render();
+}
+
+function render() {
+  const rp = {}, rs = {}, sp = {};
+  reports.forEach(x => {
+    if (x.pet_id != null) (rp[x.pet_id] ||= []).push(x);
+    if (x.sighting_id != null) (rs[x.sighting_id] ||= []).push(x);
+  });
+  sights.forEach(x => (sp[x.pet_id] ||= []).push(x));
+  const flagged = p => (rp[p.id] || []).length || p.hidden || (sp[p.id] || []).some(x => (rs[x.id] || []).length || x.hidden);
+  const list = pets.filter(p => filter === 'all' ? true : filter === 'hidden' ? p.hidden : flagged(p));
+
+  const counts = { reported: pets.filter(flagged).length, hidden: pets.filter(p => p.hidden).length, all: pets.length };
+  const names = { reported: '🚩 신고', hidden: '🙈 숨김', all: '전체' };
+  document.querySelectorAll('.tab').forEach(b => {
+    const f = b.dataset.filter;
+    b.textContent = `${names[f]} ${counts[f]}`;
+    b.className = 'tab flex-1 text-xs font-bold py-2 rounded-xl ' + (f === filter ? 'bg-indigo-600 text-white' : 'bg-white border border-gray-200 text-gray-600');
+  });
+
+  const reasonList = arr => (arr || []).map(x => `<li>${esc(x.reason)}${x.detail ? ' — ' + esc(x.detail) : ''} <span class="text-gray-400">(${fmt(x.created_at)})</span></li>`).join('');
+  document.getElementById('list').innerHTML = list.length ? list.map(p => {
+    const ss = sp[p.id] || [], pr = rp[p.id] || [];
+    return `<div class="bg-white rounded-xl border ${p.hidden ? 'border-red-300' : 'border-gray-200'} p-3 space-y-2">
+      <div class="flex gap-3">
+        <img src="${esc(p.image_url)}" alt="" class="w-24 h-24 rounded-lg object-cover bg-gray-200">
+        <div class="flex-1 min-w-0 text-xs">
+          <p class="font-bold text-sm truncate">${esc(p.name) || '이름 없음'} ${p.type === 'dog' ? '🐶' : '🐱'}
+            ${p.hidden ? '<span class="text-red-500 text-[10px]">숨김</span>' : ''}</p>
+          <p class="text-gray-500">${fmt(p.created_at)} · 목격 사진 ${ss.length}장 · 신고 ${pr.length}건</p>
+          ${pr.length ? `<ul class="mt-1 list-disc pl-4 text-gray-600">${reasonList(pr)}</ul>` : ''}
+        </div>
+      </div>
+      <div class="flex gap-2">
+        <button data-act="del-pet" data-id="${esc(p.id)}" class="flex-1 bg-red-500 text-white text-xs font-bold py-2 rounded-lg disabled:opacity-50">완전 삭제</button>
+        <button data-act="toggle-pet" data-id="${esc(p.id)}" class="flex-1 border border-gray-300 text-xs font-bold py-2 rounded-lg disabled:opacity-50">${p.hidden ? '숨김 해제' : '숨기기'}</button>
+        ${pr.length ? `<button data-act="dismiss-pet" data-id="${esc(p.id)}" class="flex-1 border border-gray-300 text-xs font-bold py-2 rounded-lg disabled:opacity-50">신고 무시</button>` : ''}
+      </div>
+      ${ss.length ? `<div class="space-y-2 border-t border-gray-100 pt-2">${ss.map(x => { const sr = rs[x.id] || []; return `
+        <div class="flex items-start gap-2 text-xs">
+          <img src="${esc(x.image_url)}" alt="" class="w-14 h-14 rounded-lg object-cover bg-gray-200">
+          <div class="flex-1 min-w-0"><p class="text-gray-500">${fmt(x.created_at)} ${x.hidden ? '<span class="text-red-500">숨김</span>' : ''} · 신고 ${sr.length}건</p>
+            ${sr.length ? `<ul class="list-disc pl-4 text-gray-600">${reasonList(sr)}</ul>` : ''}</div>
+          <div class="flex flex-col gap-1">
+            <button data-act="del-sight" data-id="${esc(x.id)}" class="bg-red-500 text-white font-bold px-2 py-1 rounded disabled:opacity-50">삭제</button>
+            ${sr.length || x.hidden ? `<button data-act="dismiss-sight" data-id="${esc(x.id)}" class="border border-gray-300 font-bold px-2 py-1 rounded disabled:opacity-50">복구</button>` : ''}
+          </div>
+        </div>`; }).join('')}</div>` : ''}
+    </div>`;
+  }).join('') : '<p class="text-sm text-gray-400 text-center py-8">표시할 항목이 없어요. (전체가 0이면 관리자 이메일로 로그인했는지 확인하세요)</p>';
+}
+
+document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => { filter = b.dataset.filter; render(); }));
+
+// RLS 때문에 조용히 0건 처리되는 경우를 잡아내는 헬퍼
+async function must(q, what) {
+  const { data, error } = await q.select();
+  if (error) throw new Error(error.message);
+  if (!data.length) throw new Error(what + ' 권한이 없거나 대상이 없어요. SQL 설정(관리자 이메일)을 확인하세요.');
+}
+async function removeFiles(urls) {
+  const names = urls.map(fileOf).filter(Boolean);
+  if (!names.length) return;
+  const { data, error } = await sb.storage.from('cat-images').remove(names);
+  if (error) throw new Error(error.message);
+  if (!data.length && !confirm('사진 파일을 찾지 못했어요(이미 삭제됐거나 권한 없음). DB 기록만 삭제할까요?')) throw new Error('취소했어요.');
+}
+
+document.getElementById('list').addEventListener('click', async e => {
+  const b = e.target.closest('button[data-act]'); if (!b) return;
+  const { act, id } = b.dataset;
+  b.disabled = true;
+  try {
+    if (act === 'del-pet') {
+      const pet = pets.find(x => String(x.id) === id);
+      const ss = sights.filter(x => String(x.pet_id) === id);
+      if (!confirm(`'${pet.name}'와(과) 목격 사진 ${ss.length}장을 사진 파일까지 완전히 삭제할까요?`)) return;
+      await removeFiles([pet.image_url, ...ss.map(x => x.image_url)]);
+      await must(sb.from('pets').delete().eq('id', id), '삭제');
+    } else if (act === 'del-sight') {
+      const s = sights.find(x => String(x.id) === id);
+      if (!confirm('이 목격 사진을 파일까지 삭제할까요?')) return;
+      await removeFiles([s.image_url]);
+      await must(sb.from('sightings').delete().eq('id', id), '삭제');
+    } else if (act === 'toggle-pet') {
+      const pet = pets.find(x => String(x.id) === id);
+      await must(sb.from('pets').update({ hidden: !pet.hidden }).eq('id', id), '수정');
+    } else if (act === 'dismiss-pet') {
+      await sb.from('reports').delete().eq('pet_id', id);
+      await must(sb.from('pets').update({ hidden: false }).eq('id', id), '수정');
+    } else if (act === 'dismiss-sight') {
+      await sb.from('reports').delete().eq('sighting_id', id);
+      await must(sb.from('sightings').update({ hidden: false }).eq('id', id), '수정');
+    }
+  } catch (err) { alert(err.message); }
+  finally { await load(); }
+});
+
+sb.auth.getSession().then(({ data }) => { if (data.session) show(); });
+</script>
+</body>
+</html>
