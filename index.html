@@ -10,212 +10,273 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 <body class="bg-gray-50 text-gray-800 max-w-md mx-auto min-h-screen flex flex-col">
+
+<!-- 홈 -->
 <header class="bg-indigo-600 p-4 text-white font-bold text-lg flex justify-between items-center shadow-md">
   <span>🐶🐱 우리동네 멍냥이 수호대</span>
-  <span class="text-xs bg-white text-indigo-600 px-2 py-1 rounded-full">MVP v1.1</span>
+  <span class="text-xs bg-white text-indigo-600 px-2 py-1 rounded-full">v1.2</span>
 </header>
-
 <main class="flex-1 p-4 pb-24 space-y-4">
   <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-3 text-xs text-indigo-900">
     <p class="font-semibold">🚨 우리동네 반려동물 지킴이 안내</p>
     <p>· 길고양이 혹은 길 잃은 강아지를 발견하셨나요?</p>
     <p>· 인식표가 있다면 정확한 이름을, 없다면 특징을 남겨주세요!</p>
   </div>
-
   <div class="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100 p-2">
     <div class="text-xs font-bold text-gray-600 mb-1 px-1">📍 내 주변 멍냥이 목격 지도 <span class="font-normal text-gray-400">(위치는 약 100m 범위로 흐리게 표시)</span></div>
     <div id="map" class="w-full h-48 rounded-lg z-0"></div>
   </div>
-
   <div class="flex gap-2">
-    <button onclick="filterPets('all')" id="filter-all" class="flex-1 bg-indigo-600 text-white text-xs font-bold py-2 rounded-xl transition">전체보기</button>
-    <button onclick="filterPets('dog')" id="filter-dog" class="flex-1 bg-white border border-gray-200 text-gray-600 text-xs font-bold py-2 rounded-xl transition">🐶 강아지</button>
-    <button onclick="filterPets('cat')" id="filter-cat" class="flex-1 bg-white border border-gray-200 text-gray-600 text-xs font-bold py-2 rounded-xl transition">🐱 고양이</button>
+    <button onclick="filterPets('all')" id="filter-all" class="flex-1 bg-indigo-600 text-white text-xs font-bold py-2 rounded-xl">전체보기</button>
+    <button onclick="filterPets('dog')" id="filter-dog" class="flex-1 bg-white border border-gray-200 text-gray-600 text-xs font-bold py-2 rounded-xl">🐶 강아지</button>
+    <button onclick="filterPets('cat')" id="filter-cat" class="flex-1 bg-white border border-gray-200 text-gray-600 text-xs font-bold py-2 rounded-xl">🐱 고양이</button>
   </div>
-
   <div class="font-bold text-sm text-gray-700 mt-2">✨ 실시간 동네 제보 피드</div>
-  <div id="feed-list" class="space-y-4">
-    <div class="bg-white rounded-xl shadow-sm p-4 text-center text-gray-400 text-xs">데이터를 불러오는 중...</div>
-  </div>
+  <div id="feed-list" class="space-y-4"><div class="bg-white rounded-xl p-4 text-center text-gray-400 text-xs">불러오는 중...</div></div>
 </main>
-
-<nav class="fixed bottom-0 max-w-md w-full bg-white border-t border-gray-200 p-3 flex justify-center shadow-lg z-50">
-  <label class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl shadow transition flex items-center justify-center gap-2 cursor-pointer text-center text-sm">
+<nav class="fixed bottom-0 max-w-md w-full bg-white border-t border-gray-200 p-3 flex justify-center shadow-lg z-30">
+  <label class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl shadow flex items-center justify-center cursor-pointer text-sm">
     <span>📷 멍냥이 사진 찍기</span>
-    <input type="file" id="initial-pet-image" accept="image/*" class="hidden" onchange="handleImageSelected(event)">
+    <input type="file" accept="image/*" class="hidden" onchange="handleImageSelected(event)">
   </label>
 </nav>
 
-<div id="report-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-  <div class="bg-white rounded-2xl w-full max-w-sm p-5 space-y-4 max-h-[90vh] overflow-y-auto">
-    <h3 class="font-bold text-lg text-gray-800">🐾 멍냥이 개체 확인</h3>
+<!-- 상세 화면 -->
+<div id="detail" class="hidden fixed inset-0 bg-gray-50 z-40 max-w-md mx-auto overflow-y-auto">
+  <header class="sticky top-0 bg-indigo-600 text-white p-4 flex items-center gap-2 font-bold shadow-md z-10">
+    <span data-back></span><span id="detail-title" class="flex-1 truncate"></span>
+  </header>
+  <div id="detail-body" class="p-4 space-y-4 pb-10"></div>
+</div>
+
+<!-- 등록 화면 -->
+<div id="register" class="hidden fixed inset-0 bg-gray-50 z-50 max-w-md mx-auto overflow-y-auto">
+  <header class="sticky top-0 bg-indigo-600 text-white p-4 flex items-center gap-2 font-bold shadow-md z-10">
+    <span data-back></span><span>🐾 멍냥이 개체 확인</span>
+  </header>
+  <div class="p-4 space-y-4 pb-10">
     <p class="text-xs text-gray-500">찍으신 사진과 아래 동네 친구들을 비교해보세요!</p>
-    <div class="w-full h-40 bg-gray-100 rounded-xl overflow-hidden flex items-center justify-center border border-gray-200">
+    <div class="w-full h-44 bg-gray-100 rounded-xl overflow-hidden border border-gray-200">
       <img id="preview-img" class="w-full h-full object-cover" alt="찍은 사진">
     </div>
-
     <div>
       <label class="text-xs text-gray-500 font-semibold">어떤 동물인가요?</label>
       <div class="grid grid-cols-2 gap-2 mt-1">
-        <button type="button" onclick="setPetType('dog')" id="type-dog-btn" class="border border-indigo-600 bg-indigo-50 text-indigo-700 font-bold py-2 rounded-xl text-xs transition">🐶 강아지</button>
-        <button type="button" onclick="setPetType('cat')" id="type-cat-btn" class="border border-gray-200 bg-white text-gray-600 font-bold py-2 rounded-xl text-xs transition">🐱 고양이</button>
+        <button type="button" onclick="setPetType('dog')" id="type-dog-btn" class="border py-2 rounded-xl text-xs font-bold">🐶 강아지</button>
+        <button type="button" onclick="setPetType('cat')" id="type-cat-btn" class="border py-2 rounded-xl text-xs font-bold">🐱 고양이</button>
       </div>
     </div>
-
     <div>
       <label class="text-xs text-gray-500 font-semibold">1. 이미 등록된 동네 친구인가요?</label>
-      <div id="existing-pets-container" class="mt-2 space-y-2 max-h-32 overflow-y-auto border border-gray-200 rounded-xl p-2 bg-gray-50"></div>
+      <div id="existing-pets-container" class="mt-2 space-y-2 max-h-40 overflow-y-auto border border-gray-200 rounded-xl p-2 bg-white"></div>
     </div>
-
     <div class="border-t border-gray-200 pt-3">
       <label class="text-xs text-gray-500 font-semibold">2. 새로운 친구라면 이름(인식표 이름)을 적어주세요</label>
-      <input type="text" id="new-pet-name" maxlength="20" placeholder="예: 초코, 몽이, 혹은 '인식표 없음(노랑이)'" class="w-full mt-1 border border-gray-300 rounded-lg p-2 text-sm focus:outline-none focus:border-indigo-500 disabled:bg-gray-100">
+      <input type="text" id="new-pet-name" maxlength="20" class="w-full mt-1 border border-gray-300 rounded-lg p-2 text-sm focus:outline-none focus:border-indigo-500 disabled:bg-gray-100">
     </div>
+    <button onclick="submitRegister()" id="submit-btn" class="w-full bg-indigo-600 text-white py-3 rounded-xl text-sm font-bold">등록하기</button>
+  </div>
+</div>
 
-    <div class="flex gap-2 pt-2">
-      <button onclick="closeReportModal()" class="flex-1 bg-gray-200 text-gray-700 py-2 rounded-xl text-sm font-bold">취소</button>
-      <button onclick="submitReport()" id="submit-btn" class="flex-1 bg-indigo-600 text-white py-2 rounded-xl text-sm font-bold">등록하기</button>
-    </div>
+<!-- 신고 화면 -->
+<div id="report" class="hidden fixed inset-0 bg-gray-50 z-[60] max-w-md mx-auto overflow-y-auto">
+  <header class="sticky top-0 bg-red-500 text-white p-4 flex items-center gap-2 font-bold shadow-md z-10">
+    <span data-back></span><span>🚩 신고 · 삭제 요청</span>
+  </header>
+  <div class="p-4 space-y-4 pb-10">
+    <p id="report-target" class="text-sm text-gray-600"></p>
+    <div id="reason-list" class="space-y-2"></div>
+    <textarea id="report-detail" maxlength="200" rows="3" placeholder="자세한 내용 (선택, 200자 이내)" class="w-full border border-gray-300 rounded-lg p-2 text-sm"></textarea>
+    <p class="text-[11px] text-gray-400">신고가 여러 건 쌓이면 해당 제보가 자동으로 숨겨지고, 운영자가 확인 후 삭제합니다. 내가 올린 사진을 지우고 싶을 때도 '삭제 요청'을 선택해주세요.</p>
+    <button id="report-submit" onclick="submitReportForm()" class="w-full bg-red-500 text-white py-3 rounded-xl text-sm font-bold">신고하기</button>
   </div>
 </div>
 
 <script>
-const SUPABASE_URL = 'https://zholdszcpnnotiofoeot.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_SL6t58EupHer5LU-O9L7Qw_xGg5Iz5-';
-const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const supabaseClient = supabase.createClient(
+  'https://zholdszcpnnotiofoeot.supabase.co',
+  'sb_publishable_SL6t58EupHer5LU-O9L7Qw_xGg5Iz5-');
 
-// 사용자 입력을 HTML에 넣기 전에 반드시 거치는 이스케이프 (XSS 방지)
 const esc = s => String(s ?? '').replace(/[&<>"']/g,
   c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = s => new Date(s).toLocaleDateString('ko-KR');
+const NAME_PH = "예: 초코, 몽이, 혹은 '인식표 없음(노랑이)'";
+const REASONS = ['부적절한 사진', '부적절한 이름', '같은 동물이 중복 등록됨', '잘못된 정보 (종류·위치 등)', '삭제 요청 (내가 올린 사진)', '기타'];
+const ON = 'border-indigo-600 bg-indigo-50 text-indigo-700', OFF = 'border-gray-200 bg-white text-gray-600';
 
-const NAME_PLACEHOLDER = "예: 초코, 몽이, 혹은 '인식표 없음(노랑이)'";
+/* ---------- 화면 이동: 왼쪽 화살표 = 브라우저 뒤로가기와 동일 ---------- */
+const BACK = '<button type="button" onclick="history.back()" aria-label="뒤로가기" class="p-1 -ml-1 rounded-full active:bg-white/25"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>';
+document.querySelectorAll('[data-back]').forEach(e => e.outerHTML = BACK);
+
+function applyScreen(s) {
+  const show = (id, on) => document.getElementById(id).classList.toggle('hidden', !on);
+  show('detail', s === 'detail' || s === 'report');
+  show('register', s === 'register');
+  show('report', s === 'report');
+  document.body.style.overflow = s === 'home' ? '' : 'hidden';
+}
+function go(s) { history.pushState({ s }, ''); applyScreen(s); }
+window.addEventListener('popstate', e => applyScreen(e.state?.s || 'home'));
+history.replaceState({ s: 'home' }, '');
+
+/* ---------- 상태 ---------- */
 let map, markerLayer;
-let currentLat = 37.5665, currentLng = 126.9780;
-let locationReady = false;               // 실제 GPS를 얻었는지
-let selectedCompressedBlob = null;
-let selectedExistingPetId = null;
-let selectedPetType = 'dog';
-let currentFilter = 'all';
-let allPetsData = [];
-let sightingsByPet = {};                 // pet_id -> 목격 기록 배열(최신순)
+let currentLat = 37.5665, currentLng = 126.9780, locationReady = false;
+let selectedBlob = null, selectedExistingPetId = null, selectedPetType = 'dog';
+let currentFilter = 'all', allPetsData = [], sightingsByPet = {};
+let detailPet = null, reportTarget = null;
 
 function initMap() {
   map = L.map('map').setView([currentLat, currentLng], 15);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
   markerLayer = L.layerGroup().addTo(map);
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(pos => {
-      currentLat = pos.coords.latitude;
-      currentLng = pos.coords.longitude;
-      locationReady = true;
-      map.setView([currentLat, currentLng], 15);
-      L.circleMarker([currentLat, currentLng], { radius: 8, color: '#fff', weight: 2, fillColor: '#4f46e5', fillOpacity: 1 })
-        .addTo(map).bindPopup('내 현재 위치');
-    }, () => { locationReady = false; });
-  }
+  navigator.geolocation?.getCurrentPosition(pos => {
+    currentLat = pos.coords.latitude; currentLng = pos.coords.longitude; locationReady = true;
+    map.setView([currentLat, currentLng], 15);
+    L.circleMarker([currentLat, currentLng], { radius: 8, color: '#fff', weight: 2, fillColor: '#4f46e5', fillOpacity: 1 })
+      .addTo(map).bindPopup('내 현재 위치');
+  }, () => { locationReady = false; });
 }
 
+/* ---------- 피드 ---------- */
 async function fetchPets() {
-  const feedList = document.getElementById('feed-list');
-  const [petsRes, sightRes] = await Promise.all([
+  const [p, s] = await Promise.all([
     supabaseClient.from('pets').select('*').order('created_at', { ascending: false }),
     supabaseClient.from('sightings').select('*').order('created_at', { ascending: false }).limit(500)
   ]);
-
-  if (petsRes.error) {
-    feedList.innerHTML = `<div class="bg-white rounded-xl shadow-sm p-6 text-center text-red-400 text-sm">불러오지 못했어요. 잠시 후 다시 시도해주세요.</div>`;
+  if (p.error) {
+    document.getElementById('feed-list').innerHTML = '<div class="bg-white rounded-xl p-6 text-center text-red-400 text-sm">불러오지 못했어요. 잠시 후 다시 시도해주세요.</div>';
     return;
   }
-  allPetsData = petsRes.data || [];
+  allPetsData = p.data || [];
   sightingsByPet = {};
-  (sightRes.data || []).forEach(s => (sightingsByPet[s.pet_id] ||= []).push(s));
-  renderFeed();
-  renderMarkers();
+  (s.data || []).forEach(x => (sightingsByPet[x.pet_id] ||= []).push(x));
+  renderFeed(); renderMarkers();
 }
 
 function renderMarkers() {
   markerLayer.clearLayers();
   allPetsData.forEach(pet => {
-    const last = (sightingsByPet[pet.id] || [])[0];
-    const lat = last ? last.latitude : pet.latitude;
-    const lng = last ? last.longitude : pet.longitude;
-    if (lat == null || lng == null) return;
-    const color = pet.type === 'dog' ? '#d97706' : '#7c3aed';
-    L.circleMarker([lat, lng], { radius: 7, color: '#fff', weight: 2, fillColor: color, fillOpacity: 0.9 })
+    const last = (sightingsByPet[pet.id] || [])[0] || pet;
+    if (last.latitude == null || last.longitude == null) return;
+    L.circleMarker([last.latitude, last.longitude], { radius: 7, color: '#fff', weight: 2, fillColor: pet.type === 'dog' ? '#d97706' : '#7c3aed', fillOpacity: .9 })
       .addTo(markerLayer).bindPopup(`${pet.type === 'dog' ? '🐶' : '🐱'} ${esc(pet.name) || '이름 없음'}`);
   });
 }
 
+const badge = t => t === 'dog'
+  ? '<span class="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-bold">🐶 강아지</span>'
+  : '<span class="text-[10px] bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full font-bold">🐱 고양이</span>';
+
 function renderFeed() {
-  const feedList = document.getElementById('feed-list');
-  const filtered = currentFilter === 'all' ? allPetsData : allPetsData.filter(p => p.type === currentFilter);
-
-  if (filtered.length === 0) {
-    feedList.innerHTML = `<div class="bg-white rounded-xl shadow-sm p-6 text-center text-gray-400 text-sm">${allPetsData.length === 0 ? '아직 등록된 멍냥이가 없어요. 첫 제보를 남겨주세요! 🐾' : '해당하는 동물이 없어요!'}</div>`;
-    return;
-  }
-
-  feedList.innerHTML = filtered.map(pet => {
-    const isDog = pet.type === 'dog';
-    const badge = isDog ? '🐶 강아지' : '🐱 고양이';
-    const color = isDog ? 'bg-amber-100 text-amber-800' : 'bg-purple-100 text-purple-800';
-    const list = sightingsByPet[pet.id] || [];
-    const lastDate = new Date((list[0] || pet).created_at).toLocaleDateString('ko-KR');
-    return `
-      <div class="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
-        <div class="p-3 flex items-center justify-between">
-          <span class="font-bold text-sm">${esc(pet.name) || '이름 없음'}</span>
-          <span class="text-[10px] ${color} px-2 py-0.5 rounded-full font-bold">${badge}</span>
-        </div>
-        <div class="bg-gray-100 h-48 flex items-center justify-center text-gray-400 text-xs overflow-hidden">
-          ${pet.image_url ? `<img src="${esc(pet.image_url)}" alt="${esc(pet.name)}" loading="lazy" class="w-full h-full object-cover">` : '[사진 없음]'}
-        </div>
-        <div class="p-3 text-xs text-gray-600 flex justify-between items-center">
-          <p>👀 목격 ${list.length + 1}회</p>
-          <span class="text-[10px] text-gray-400">최근 ${lastDate}</span>
-        </div>
-      </div>`;
-  }).join('');
+  const list = currentFilter === 'all' ? allPetsData : allPetsData.filter(p => p.type === currentFilter);
+  document.getElementById('feed-list').innerHTML = list.length === 0
+    ? `<div class="bg-white rounded-xl p-6 text-center text-gray-400 text-sm">${allPetsData.length ? '해당하는 동물이 없어요!' : '아직 등록된 멍냥이가 없어요. 첫 제보를 남겨주세요! 🐾'}</div>`
+    : list.map(pet => {
+        const n = (sightingsByPet[pet.id] || []).length + 1;
+        const last = (sightingsByPet[pet.id] || [])[0] || pet;
+        return `<div data-pet="${esc(pet.id)}" class="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100 cursor-pointer active:opacity-80">
+          <div class="p-3 flex items-center justify-between"><span class="font-bold text-sm">${esc(pet.name) || '이름 없음'}</span>${badge(pet.type)}</div>
+          <div class="bg-gray-100 h-48 overflow-hidden">${pet.image_url ? `<img src="${esc(pet.image_url)}" alt="${esc(pet.name)}" loading="lazy" class="w-full h-full object-cover">` : ''}</div>
+          <div class="p-3 text-xs text-gray-600 flex justify-between"><p>👀 목격 ${n}회</p><span class="text-[10px] text-gray-400">최근 ${fmt(last.created_at)}</span></div>
+        </div>`;
+      }).join('');
 }
+document.getElementById('feed-list').addEventListener('click', e => {
+  const el = e.target.closest('[data-pet]'); if (el) openDetail(el.dataset.pet);
+});
 
 function filterPets(type) {
   currentFilter = type;
-  ['all', 'dog', 'cat'].forEach(t => {
-    document.getElementById(`filter-${t}`).className = t === type
-      ? "flex-1 bg-indigo-600 text-white text-xs font-bold py-2 rounded-xl transition"
-      : "flex-1 bg-white border border-gray-200 text-gray-600 text-xs font-bold py-2 rounded-xl transition";
-  });
+  ['all', 'dog', 'cat'].forEach(t => document.getElementById('filter-' + t).className = t === type
+    ? 'flex-1 bg-indigo-600 text-white text-xs font-bold py-2 rounded-xl'
+    : 'flex-1 bg-white border border-gray-200 text-gray-600 text-xs font-bold py-2 rounded-xl');
   renderFeed();
 }
 
+/* ---------- 상세 화면 ---------- */
+function openDetail(id) {
+  const pet = allPetsData.find(p => String(p.id) === id); if (!pet) return;
+  detailPet = pet;
+  const list = sightingsByPet[pet.id] || [];
+  document.getElementById('detail-title').textContent = pet.name || '이름 없음';
+  document.getElementById('detail-body').innerHTML = `
+    <img src="${esc(pet.image_url)}" alt="${esc(pet.name)}" class="w-full h-64 object-cover rounded-xl bg-gray-200">
+    <div class="flex items-center justify-between"><span class="font-bold text-lg">${esc(pet.name) || '이름 없음'}</span>${badge(pet.type)}</div>
+    <p class="text-xs text-gray-500">처음 발견 ${fmt(pet.created_at)} · 목격 ${list.length + 1}회</p>
+    ${list.length ? `<div class="font-bold text-sm">목격 기록</div><div class="space-y-2">${list.map(s => `
+      <div class="bg-white rounded-xl border border-gray-100 p-2 flex items-center gap-3">
+        <img src="${esc(s.image_url)}" alt="" loading="lazy" class="w-14 h-14 rounded-lg object-cover bg-gray-200">
+        <span class="flex-1 text-xs text-gray-600">${fmt(s.created_at)}</span>
+        <button data-sight="${esc(s.id)}" class="text-[11px] text-red-500 font-bold px-2 py-1">신고</button>
+      </div>`).join('')}</div>` : ''}
+    <button data-pet-report class="w-full border border-red-200 text-red-600 text-sm font-bold py-3 rounded-xl">🚩 이 제보 신고 · 삭제 요청</button>`;
+  document.getElementById('detail').scrollTop = 0;
+  go('detail');
+}
+document.getElementById('detail-body').addEventListener('click', e => {
+  const s = e.target.closest('[data-sight]');
+  if (s) return openReport({ kind: 'sighting', id: s.dataset.sight, label: '이 목격 사진' });
+  if (e.target.closest('[data-pet-report]'))
+    openReport({ kind: 'pet', id: detailPet.id, label: `'${detailPet.name || '이름 없음'}' 제보` });
+});
+
+/* ---------- 신고 ---------- */
+const reportedKey = t => `${t.kind}:${t.id}`;
+function getReported() { try { return JSON.parse(localStorage.getItem('reported') || '[]'); } catch { return []; } }
+function addReported(k) { try { localStorage.setItem('reported', JSON.stringify([...getReported(), k])); } catch {} }
+
+function openReport(target) {
+  reportTarget = target;
+  document.getElementById('report-target').textContent = `${target.label}을(를) 신고합니다. 이유를 선택해주세요.`;
+  document.getElementById('reason-list').innerHTML = REASONS.map(r =>
+    `<label class="flex items-center gap-2 bg-white border border-gray-200 rounded-xl p-3 text-sm"><input type="radio" name="reason" value="${esc(r)}"> ${esc(r)}</label>`).join('');
+  document.getElementById('report-detail').value = '';
+  go('report');
+}
+
+async function submitReportForm() {
+  const reason = document.querySelector('input[name="reason"]:checked')?.value;
+  if (!reason) return alert('신고 이유를 선택해주세요.');
+  if (getReported().includes(reportedKey(reportTarget))) return alert('이미 신고하신 제보예요.');
+  const btn = document.getElementById('report-submit');
+  btn.disabled = true; btn.innerText = '접수 중...';
+  const row = { reason, detail: document.getElementById('report-detail').value.trim() || null };
+  row[reportTarget.kind === 'pet' ? 'pet_id' : 'sighting_id'] = reportTarget.id;
+  const { error } = await supabaseClient.from('reports').insert([row]);
+  btn.disabled = false; btn.innerText = '신고하기';
+  if (error) return alert('신고를 접수하지 못했어요. 잠시 후 다시 시도해주세요.');
+  addReported(reportedKey(reportTarget));
+  alert('신고가 접수되었어요. 확인 후 조치할게요.');
+  history.back();
+  fetchPets();
+}
+
+/* ---------- 등록 ---------- */
 function setPetType(type) {
   selectedPetType = type;
-  const on = "border border-indigo-600 bg-indigo-50 text-indigo-700 font-bold py-2 rounded-xl text-xs transition";
-  const off = "border border-gray-200 bg-white text-gray-600 font-bold py-2 rounded-xl text-xs transition";
-  document.getElementById('type-dog-btn').className = type === 'dog' ? on : off;
-  document.getElementById('type-cat-btn').className = type === 'cat' ? on : off;
+  document.getElementById('type-dog-btn').className = 'border py-2 rounded-xl text-xs font-bold ' + (type === 'dog' ? ON : OFF);
+  document.getElementById('type-cat-btn').className = 'border py-2 rounded-xl text-xs font-bold ' + (type === 'cat' ? ON : OFF);
   loadExistingPetsForMatch();
 }
 
 function resizeImage(file) {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = reject;
-    reader.onload = e => {
+    const r = new FileReader();
+    r.onerror = reject;
+    r.onload = e => {
       const img = new Image();
       img.onerror = reject;
       img.onload = () => {
-        const MAX = 800;
         let w = img.width, h = img.height;
-        if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
-        const canvas = document.createElement('canvas');
-        canvas.width = w; canvas.height = h;
-        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        canvas.toBlob(b => resolve(b), 'image/jpeg', 0.8);
+        if (w > 800) { h = Math.round(h * 800 / w); w = 800; }
+        const c = document.createElement('canvas'); c.width = w; c.height = h;
+        c.getContext('2d').drawImage(img, 0, 0, w, h);
+        c.toBlob(resolve, 'image/jpeg', 0.8);
       };
       img.src = e.target.result;
     };
-    reader.readAsDataURL(file);
+    r.readAsDataURL(file);
   });
 }
 
@@ -223,111 +284,75 @@ async function handleImageSelected(event) {
   const file = event.target.files[0];
   event.target.value = '';
   if (!file) return;
-  if (!file.type.startsWith('image/')) { alert('이미지 파일만 올릴 수 있어요.'); return; }
-  try {
-    selectedCompressedBlob = await resizeImage(file);
-  } catch { alert('사진을 읽지 못했어요. 다른 사진으로 시도해주세요.'); return; }
-  document.getElementById('preview-img').src = URL.createObjectURL(selectedCompressedBlob);
-  document.getElementById('report-modal').classList.remove('hidden');
-  loadExistingPetsForMatch();
+  if (!file.type.startsWith('image/')) return alert('이미지 파일만 올릴 수 있어요.');
+  try { selectedBlob = await resizeImage(file); } catch { return alert('사진을 읽지 못했어요. 다른 사진으로 시도해주세요.'); }
+  document.getElementById('preview-img').src = URL.createObjectURL(selectedBlob);
+  setPetType(selectedPetType);
+  document.getElementById('register').scrollTop = 0;
+  go('register');
 }
 
-// 입력창/선택 상태를 "새로 등록" 기본값으로 되돌림
 function resetNameInput() {
-  const input = document.getElementById('new-pet-name');
-  input.value = '';
-  input.disabled = false;
-  input.placeholder = NAME_PLACEHOLDER;
+  const i = document.getElementById('new-pet-name');
+  i.value = ''; i.disabled = false; i.placeholder = NAME_PH;
   selectedExistingPetId = null;
 }
 
 function loadExistingPetsForMatch() {
   resetNameInput();
-  const container = document.getElementById('existing-pets-container');
+  const box = document.getElementById('existing-pets-container');
   const pets = allPetsData.filter(p => p.type === selectedPetType);
-
-  if (pets.length === 0) {
-    container.innerHTML = `<p class="text-xs text-center text-gray-400 py-2">등록된 친구가 없어요. 아래에 새 이름을 적어주세요!</p>`;
-    return;
-  }
-  container.innerHTML = `
-    <div data-id="" class="existing-pet-card p-2 rounded-lg border border-indigo-500 bg-indigo-50 text-xs font-bold cursor-pointer text-center">✨ 새로운 친구로 등록할래요!</div>`
-    + pets.map(pet => `
-    <div data-id="${esc(pet.id)}" class="existing-pet-card p-2 rounded-lg border border-gray-200 bg-white text-xs flex items-center gap-3 cursor-pointer hover:border-indigo-400">
-      <img src="${esc(pet.image_url)}" alt="" class="w-10 h-10 rounded-full object-cover bg-gray-200">
-      <div><p class="font-bold">${esc(pet.name)}</p><p class="text-[10px] text-gray-400">기존 등록된 친구</p></div>
-    </div>`).join('');
-
-  container.querySelectorAll('.existing-pet-card').forEach(el =>
-    el.addEventListener('click', () => selectExistingPet(el.dataset.id || null, el)));
+  if (!pets.length) { box.innerHTML = '<p class="text-xs text-center text-gray-400 py-2">등록된 친구가 없어요. 아래에 새 이름을 적어주세요!</p>'; return; }
+  box.innerHTML = `<div data-id="" class="existing-pet-card p-2 rounded-lg border border-indigo-500 bg-indigo-50 text-xs font-bold cursor-pointer text-center">✨ 새로운 친구로 등록할래요!</div>`
+    + pets.map(p => `<div data-id="${esc(p.id)}" class="existing-pet-card p-2 rounded-lg border border-gray-200 bg-white text-xs flex items-center gap-3 cursor-pointer">
+      <img src="${esc(p.image_url)}" alt="" class="w-10 h-10 rounded-full object-cover bg-gray-200">
+      <div><p class="font-bold">${esc(p.name)}</p><p class="text-[10px] text-gray-400">기존 등록된 친구</p></div></div>`).join('');
+  box.querySelectorAll('.existing-pet-card').forEach(el => el.addEventListener('click', () => selectExistingPet(el.dataset.id || null, el)));
 }
 
-function selectExistingPet(petId, element) {
-  selectedExistingPetId = petId;
+function selectExistingPet(id, el) {
+  selectedExistingPetId = id;
   document.querySelectorAll('.existing-pet-card').forEach(c => {
-    c.classList.remove('border-indigo-500', 'bg-indigo-50');
-    c.classList.add('border-gray-200', 'bg-white');
+    c.classList.remove('border-indigo-500', 'bg-indigo-50'); c.classList.add('border-gray-200', 'bg-white');
   });
-  element.classList.remove('border-gray-200', 'bg-white');
-  element.classList.add('border-indigo-500', 'bg-indigo-50');
-
-  const input = document.getElementById('new-pet-name');
-  input.value = '';
-  input.disabled = !!petId;
-  input.placeholder = petId ? '기존 친구에 목격 기록이 추가됩니다.' : NAME_PLACEHOLDER;
+  el.classList.remove('border-gray-200', 'bg-white'); el.classList.add('border-indigo-500', 'bg-indigo-50');
+  const i = document.getElementById('new-pet-name');
+  i.value = ''; i.disabled = !!id;
+  i.placeholder = id ? '기존 친구에 목격 기록이 추가됩니다.' : NAME_PH;
 }
 
-function closeReportModal() {
-  document.getElementById('report-modal').classList.add('hidden');
-  selectedCompressedBlob = null;
-  resetNameInput();
-}
+const fuzz = v => v + (Math.random() - 0.5) * 0.002;
 
-// 정확한 좌표 대신 약 ±110m 흐림 처리한 값만 저장
-function fuzz(v) { return v + (Math.random() - 0.5) * 0.002; }
-
-async function submitReport() {
-  const submitBtn = document.getElementById('submit-btn');
-  const newName = document.getElementById('new-pet-name').value.trim();
-
-  if (!selectedExistingPetId && !newName) {
-    alert('새 이름이나 인식표 정보를 입력하거나, 목록에서 기존 친구를 선택해주세요!');
-    return;
-  }
-  if (!selectedCompressedBlob) return;
-
-  submitBtn.innerText = '저장 중...';
-  submitBtn.disabled = true;
+async function submitRegister() {
+  const btn = document.getElementById('submit-btn');
+  const name = document.getElementById('new-pet-name').value.trim();
+  if (!selectedExistingPetId && !name) return alert('새 이름이나 인식표 정보를 입력하거나, 목록에서 기존 친구를 선택해주세요!');
+  if (!selectedBlob) return;
+  btn.innerText = '저장 중...'; btn.disabled = true;
   try {
-    const fileName = `${Date.now()}_${Math.random().toString(36).slice(2, 9)}.jpg`;
-    const { error: upErr } = await supabaseClient.storage.from('cat-images')
-      .upload(fileName, selectedCompressedBlob, { contentType: 'image/jpeg' });
-    if (upErr) throw new Error('사진 업로드 실패: ' + upErr.message);
-    const imageUrl = supabaseClient.storage.from('cat-images').getPublicUrl(fileName).data.publicUrl;
-
-    // GPS를 못 얻었으면 서울시청 기본값을 저장하지 않고 위치 없음(null)으로 저장
-    const lat = locationReady ? fuzz(currentLat) : null;
-    const lng = locationReady ? fuzz(currentLng) : null;
+    const file = `${Date.now()}_${Math.random().toString(36).slice(2, 9)}.jpg`;
+    const up = await supabaseClient.storage.from('cat-images').upload(file, selectedBlob, { contentType: 'image/jpeg' });
+    if (up.error) throw new Error('사진 업로드 실패: ' + up.error.message);
+    const image_url = supabaseClient.storage.from('cat-images').getPublicUrl(file).data.publicUrl;
+    const latitude = locationReady ? fuzz(currentLat) : null;
+    const longitude = locationReady ? fuzz(currentLng) : null;
 
     if (selectedExistingPetId) {
-      // 기존 개체 정보는 건드리지 않고 목격 기록만 추가 (대표 사진 보존)
-      const { error } = await supabaseClient.from('sightings')
-        .insert([{ pet_id: selectedExistingPetId, image_url: imageUrl, latitude: lat, longitude: lng }]);
+      const { error } = await supabaseClient.from('sightings').insert([{ pet_id: selectedExistingPetId, image_url, latitude, longitude }]);
       if (error) throw new Error('목격 기록 저장 실패');
       alert('목격 기록이 추가되었습니다! 🐾');
     } else {
-      const { error } = await supabaseClient.from('pets')
-        .insert([{ name: newName, type: selectedPetType, image_url: imageUrl, latitude: lat, longitude: lng }]);
+      const { error } = await supabaseClient.from('pets').insert([{ name, type: selectedPetType, image_url, latitude, longitude }]);
       if (error) throw new Error('등록 실패');
       alert('새로운 친구가 등록되었습니다! 🐾');
     }
-    closeReportModal();
+    selectedBlob = null;
+    history.back();
     fetchPets();
   } catch (err) {
     alert(err.message);
   } finally {
-    submitBtn.innerText = '등록하기';
-    submitBtn.disabled = false;
+    btn.innerText = '등록하기'; btn.disabled = false;
   }
 }
 
