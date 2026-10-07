@@ -24,7 +24,8 @@
   </div>
   <div class="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100 p-2">
     <div class="text-xs font-bold text-gray-600 mb-1 px-1">📍 내 주변 멍냥이 목격 지도 <span class="font-normal text-gray-400">(위치는 약 100m 범위로 흐리게 표시)</span></div>
-    <div id="map" class="w-full h-48 rounded-lg z-0"></div>
+    <div id="map" class="w-full h-56 rounded-lg z-0"></div>
+    <div id="map-selected" class="px-1 pb-1"></div>
   </div>
   <div class="flex gap-2">
     <button onclick="filterPets('all')" id="filter-all" class="flex-1 bg-indigo-600 text-white text-xs font-bold py-2 rounded-xl">전체보기</button>
@@ -124,7 +125,7 @@ let map, markerLayer;
 let currentLat = 37.5665, currentLng = 126.9780, locationReady = false;
 let selectedBlob = null, selectedExistingPetId = null, selectedPetType = 'dog';
 let currentFilter = 'all', allPetsData = [], sightingsByPet = {};
-let detailPet = null, reportTarget = null;
+let detailPet = null, reportTarget = null, mapSelectedId = null;
 
 function initMap() {
   map = L.map('map').setView([currentLat, currentLng], 15);
@@ -151,7 +152,7 @@ async function fetchPets() {
   allPetsData = p.data || [];
   sightingsByPet = {};
   (s.data || []).forEach(x => (sightingsByPet[x.pet_id] ||= []).push(x));
-  renderFeed(); renderMarkers();
+  renderFeed(); renderMarkers(); showMapSelected(mapSelectedId);
 }
 
 function renderMarkers() {
@@ -159,10 +160,36 @@ function renderMarkers() {
   allPetsData.forEach(pet => {
     const last = (sightingsByPet[pet.id] || [])[0] || pet;
     if (last.latitude == null || last.longitude == null) return;
-    L.circleMarker([last.latitude, last.longitude], { radius: 7, color: '#fff', weight: 2, fillColor: pet.type === 'dog' ? '#d97706' : '#7c3aed', fillOpacity: .9 })
-      .addTo(markerLayer).bindPopup(`${pet.type === 'dog' ? '🐶' : '🐱'} ${esc(pet.name) || '이름 없음'}`);
+    const icon = L.divIcon({
+      className: 'emoji-marker',
+      html: `<div style="font-size:28px;line-height:1;filter:drop-shadow(0 1px 2px rgba(0,0,0,.45))">${pet.type === 'dog' ? '🐶' : '🐱'}</div>`,
+      iconSize: [30, 30], iconAnchor: [15, 15]
+    });
+    L.marker([last.latitude, last.longitude], { icon, title: pet.name || '' })
+      .addTo(markerLayer)
+      .on('click', () => { showMapSelected(pet.id); map.panTo([last.latitude, last.longitude]); });
   });
 }
+
+const HINT = '<p class="text-[11px] text-gray-400 text-center pt-2">🐾 지도의 🐶🐱를 누르면 여기에 표시돼요</p>';
+function showMapSelected(id) {
+  const box = document.getElementById('map-selected');
+  const pet = allPetsData.find(p => p.id === id);
+  if (!pet) { mapSelectedId = null; box.innerHTML = HINT; return; }
+  mapSelectedId = id;
+  const list = sightingsByPet[pet.id] || [];
+  const last = list[0] || pet;
+  box.innerHTML = `<div data-pet="${esc(pet.id)}" class="mt-2 flex items-center gap-3 bg-indigo-50 border border-indigo-200 rounded-xl p-2 cursor-pointer active:opacity-80">
+    <img src="${esc(pet.image_url)}" alt="${esc(pet.name)}" class="w-16 h-16 rounded-lg object-cover bg-gray-200">
+    <div class="flex-1 min-w-0">
+      <div class="flex items-center gap-2"><span class="font-bold text-sm truncate">${esc(pet.name) || '이름 없음'}</span>${badge(pet.type)}</div>
+      <p class="text-[11px] text-gray-500 mt-1">👀 목격 ${list.length + 1}회 · 최근 ${fmt(last.created_at)}</p>
+    </div>
+    <span class="text-indigo-400 text-xl">›</span></div>`;
+}
+document.getElementById('map-selected').addEventListener('click', e => {
+  const el = e.target.closest('[data-pet]'); if (el) openDetail(el.dataset.pet);
+});
 
 const badge = t => t === 'dog'
   ? '<span class="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-bold">🐶 강아지</span>'
